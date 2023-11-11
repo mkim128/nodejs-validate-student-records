@@ -2,8 +2,11 @@ const express = require("express");
 const fs = require("fs");
 const path = require("path");
 const csv = require("csv-parse");
+const fetch = require("node-fetch");
+const multer = require("multer");
 
 const app = express();
+app.use(express.json());
 const N = 10; // Maximum number of records to process
 
 // Define a port for the server to listen on
@@ -12,21 +15,15 @@ const PORT = process.env.PORT || 3000;
 var records_file = "data/Node.js Sample_Test_File.csv";
 
 // Validate input file
-function validateFileFormat(filePath) {
-  // Check that the file exists.
-  if (!fs.existsSync(filePath)) {
-    return "File does not exist.";
-  }
-
+function validateFileFormat(csvFile) {
   // Check input file in correct format.
-  const extname = path.extname(filePath);
+  const extname = path.extname(csvFile);
   if (extname.toLowerCase() !== ".csv") {
     return "Invalid file format. Expected CSV.";
   }
 
   // Check if file is empty.
-  const stats = fs.statSync(filePath);
-  if (stats.size === 0) {
+  if (csvFile["size"] === 0) {
     return "Blank/Empty file.";
   }
 
@@ -71,7 +68,8 @@ function validateRowData(row) {
   if (
     isNaN(+row["Student_Id"]) ||
     isNaN(+row["Title_Code"]) ||
-    isNaN(+row["Percentage"])
+    isNaN(+row["Percentage"]) ||
+    +row["Percentage"] > 1.0
   ) {
     return false;
   }
@@ -99,7 +97,7 @@ function validateRowData(row) {
   return true;
 }
 
-async function postData(
+async function postRecordData(
   url = "https://ucdavis-iet.com/sample-endpoint-url",
   data
 ) {
@@ -114,32 +112,48 @@ async function postData(
 }
 
 app.post("/receive", (req, res) => {
-  console.log("received");
-  console.log(req);
   // req will be the json
   // console log
+  console.log("received");
+  console.log(req.body);
+  return res;
 });
 
-app.post("/upload", (req, res) => {
+const storage = multer.memoryStorage();
+const upload = multer({ storage: storage });
+
+app.post("/upload", upload.single("csvFile"), (req, res) => {
+  console.log("in upload");
+  let csvFile = req["file"];
+  console.log(csvFile);
   // Process the uploaded file
-  const validationResult = validateFileFormat(records_file);
+  const validationResult = validateFileFormat(csvFile["originalname"]);
 
   if (validationResult) {
+    console.log(validationResult);
     return res.status(400).json({ error: validationResult });
   }
+  console.log("Valid file format");
 
-  const results = [];
   let processedRecords = 0;
-
-  const parser = fs.createReadStream(records_file).pipe(
-    csv.parse({
-      columns: true,
-      // bom needed for the first key to be parsed properly
-      bom: true,
-    })
-  );
-
+  let buffer = csvFile["buffer"];
   const records = [];
+
+  // csv({ headers: true })
+  //   .on("data", (data) => {
+  //     records.push(data);
+  //     console.log(data);
+  //   })
+  //   .on("end", () => {
+  //     console.log(records);
+  //   })
+  //   .write(buffer);
+
+  const parser = csv.parse({
+    columns: true,
+    // bom needed for the first key to be parsed properly
+    bom: true,
+  });
 
   parser.on("readable", function () {
     let record;
@@ -147,60 +161,63 @@ app.post("/upload", (req, res) => {
       console.log(record);
       records.push(record);
     }
+    console.log("done parsing");
   });
-
   parser.on("error", function (err) {
     console.error(err.message);
   });
-
   parser.on("end", function () {
     console.log("end");
-    // console.log(records);
-    // console.log(records.at(0)["First_Name"]);
-    // console.log(records.at(0)["'Student_Id'"]);
-    // console.log(Object.keys(records.at(0)));
-    postData((url = "/receive"), records);
+    console.log(records);
+    console.log(records.at(0)["First_Name"]);
+    console.log(records.at(0)["Student_Id"]);
+    postRecordData((url = "http://127.0.0.1:3000/receive"), records);
     // Email stuff
-    // return res.status(200).json({successes: successes, fails: fails});
+    // return res.status(200).json({ successes: successes, fails: fails });
+    return res.status(200).json({ records });
   });
+  parser.write(buffer);
+  parser.end();
 });
 
-const parser = fs.createReadStream(records_file).pipe(
-  csv.parse({
-    columns: true,
-    bom: true,
-  })
-);
+// const parser = fs.createReadStream(records_file).pipe(
+//   csv.parse({
+//     columns: true,
+//     bom: true,
+//   })
+// );
 
-const records = [];
-parser.on("headers", function () {
-  // Validate the header columns
-  console.log(headers);
-  const headerValidationResult = validateCSVHeaders(headers);
+// const records = [];
+// parser.on("headers", function () {
+//   // Validate the header columns
+//   console.log(headers);
+//   const headerValidationResult = validateCSVHeaders(headers);
 
-  if (headerValidationResult) {
-    return res.status(400).json({ error: headerValidationResult });
-  }
-});
-parser.on("readable", function () {
-  let record;
-  while ((record = parser.read()) !== null) {
-    console.log(record);
-    validateRowData(record);
-    records.push(record);
-  }
-});
+//   if (headerValidationResult) {
+//     return res.status(400).json({ error: headerValidationResult });
+//   }
+// });
+// parser.on("readable", function () {
+//   let record;
+//   while ((record = parser.read()) !== null) {
+//     console.log(record);
+//     validateRowData(record);
+//     records.push(record);
+//   }
+// });
 
-parser.on("error", function (err) {
-  console.error(err.message);
-});
+// parser.on("error", function (err) {
+//   console.error(err.message);
+// });
 
-parser.on("end", function () {
-  // console.log(records);
-  // console.log(records.at(0)["First_Name"]);
-  // console.log(records.at(0)["Student_Id"]);
-  // console.log(Object.keys(records.at(0)));
-});
+// parser.on("end", function () {
+//   // console.log(records);
+//   // console.log(records.at(0)["First_Name"]);
+//   // console.log(records.at(0)["Student_Id"]);
+//   // console.log(Object.keys(records.at(0)));
+// });
+
+// postRecordData("/receive");
 
 // Start the server
 app.listen(PORT, () => {
