@@ -4,15 +4,20 @@ const path = require("path");
 const csv = require("csv-parse");
 const fetch = require("node-fetch");
 const multer = require("multer");
+const nodemailer = require("nodemailer");
+
+require("dotenv").config();
+console.log(process.env.password);
 
 const app = express();
 app.use(express.json());
+
 const N = 10; // Maximum number of records to process
 
 // Define a port for the server to listen on
 const PORT = process.env.PORT || 3000;
 
-var records_file = "data/Node.js Sample_Test_File.csv";
+// var records_file = "data/Node.js Sample_Test_File.csv";
 
 // Validate input file
 function validateFileFormat(csvFile) {
