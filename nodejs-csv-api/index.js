@@ -64,8 +64,8 @@ const validateEmail = (email) => {
 };
 
 // Validate row data
-function validateRowData(row) {
-  console.log(".................validateRowData.................");
+function isvalidRow(row) {
+  console.log(".................isvalidRow.................");
   console.log("row:");
   console.log(row);
 
@@ -144,16 +144,6 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
   let buffer = csvFile["buffer"];
   const records = [];
 
-  // csv({ headers: true })
-  //   .on("data", (data) => {
-  //     records.push(data);
-  //     console.log(data);
-  //   })
-  //   .on("end", () => {
-  //     console.log(records);
-  //   })
-  //   .write(buffer);
-
   const parser = csv.parse({
     columns: true,
     // bom needed for the first key to be parsed properly
@@ -177,7 +167,7 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
     console.log(records.at(0)["First_Name"]);
     console.log(records.at(0)["Student_Id"]);
     postRecordData((url = "http://127.0.0.1:3000/receive"), records);
-    // Email stuff
+    // TODO: Email stuff
     // return res.status(200).json({ successes: successes, fails: fails });
     return res.status(200).json({ records });
   });
@@ -206,7 +196,7 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
 //   let record;
 //   while ((record = parser.read()) !== null) {
 //     console.log(record);
-//     validateRowData(record);
+//     isvalidRow(record);
 //     records.push(record);
 //   }
 // });
