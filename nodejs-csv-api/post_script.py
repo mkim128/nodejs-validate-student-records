@@ -2,8 +2,10 @@ import requests
 
 import pandas
 
-file_path = "data/Node.js Sample_Test_File.csv"
-# file_path = "data/blank.csv"
+file_path = "nodejs-csv-api/data/Node.js Sample_Test_File.csv"
+# file_path = "nodejs-csv-api/data/blank.csv"
+# file_path = "nodejs-csv-api/data/incorrectfileformat.txt"
+file_path = "nodejs-csv-api/data/partialsuccess.csv"
 root_url = "http://127.0.0.1:3000"
 
 with open(file_path, 'rb') as file:
