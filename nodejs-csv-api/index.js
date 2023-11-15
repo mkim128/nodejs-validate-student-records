@@ -85,6 +85,9 @@ function isValidRow(row) {
     isNaN(+row["Percentage"]) ||
     +row["Percentage"] > 1.0
   ) {
+    console.log(
+      "Error in this record: invalid Student_Id, Title_Code, or Percentage"
+    );
     console.log(row);
     return false;
   }
@@ -94,12 +97,14 @@ function isValidRow(row) {
     typeof row["First_Name"] !== "string" ||
     typeof row["Last_Name"] !== "string"
   ) {
+    console.log("Error in this record: invalid First_Name or Last_Name");
     console.log(row);
     return false;
   }
 
   // Email
   if (!validateEmail(row["Email"])) {
+    console.log("Error in this record: Invalid email");
     console.log(row);
     return false;
   }
@@ -108,6 +113,7 @@ function isValidRow(row) {
   let dateStr =
     row["Upload_Date"].substring(0, 5) + "20" + row["Upload_Date"].substring(5);
   if (isNaN(new Date(dateStr))) {
+    console.log("Error in this record: invalid Upload_Date");
     console.log(row);
     return false;
   }
@@ -134,18 +140,27 @@ async function postRecordData(
 //     completion
 // 6c. Generate & send an error notification email to system admin for any
 //     failed records if any.
-async function sendEmail(errorMessage) {
+async function sendEmail(errorMessage, fails) {
+  let message = "Error information:\n" + errorMessage;
+  if (fails.length > 0)
+    message =
+      "Error information:\n" +
+      errorMessage +
+      "\nFailed records:\n" +
+      JSON.stringify(fails);
+
   const mailOptions = {
     from: "mijkim@ucdavis.edu",
     to: "pi.jihwank93@gmail.com", // TODO: replace with system admin
     subject: "Sending Email using Node.js",
-    text: "Error information:\n" + errorMessage,
+    text: message,
   };
   transporter.sendMail(mailOptions, function (error, info) {
     if (error) {
       console.log(error);
     } else {
       console.log("Email sent: " + info.response);
+      console.log(mailOptions.text);
     }
   });
 }
@@ -162,7 +177,7 @@ const upload = multer({ storage: storage });
 
 app.post("/upload", upload.single("csvFile"), (req, res) => {
   let csvFile = req["file"];
-  console.log(csvFile);
+
   // Process the uploaded file
   const validationResult = validateFileFormat(csvFile["originalname"]);
 
@@ -203,7 +218,7 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
 
     // Parse records
     while ((record = parser.read()) !== null) {
-      console.log(record);
+      // console.log(record);
 
       // Convert the row array to an object using columns
       let rowData = columns.reduce((obj, header, index) => {
@@ -258,7 +273,7 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
       emailMessage = "full success";
     }
     // console.log(emailMessage);
-    sendEmail(emailMessage);
+    sendEmail(emailMessage, fails);
     // console.log();
 
     return res.status(200).json({ records });
