@@ -25,7 +25,7 @@ const transporter = nodemailer.createTransport({
 // Define a port for the server to listen on
 const PORT = process.env.PORT || 3000;
 
-// Validate input file
+// 4a. Validate input file is in correct file format e.g. sample_file.csv
 function validateFileFormat(csvFile) {
   // Check input file in correct format.
   const extname = path.extname(csvFile);
@@ -34,6 +34,8 @@ function validateFileFormat(csvFile) {
   }
 
   // Check if file is empty.
+  // This does not work, seemingly because even empty files will contain
+  // at least something in the "buffer" portion.
   if (csvFile["size"] === 0) {
     return "Blank/Empty file.";
   }
@@ -41,7 +43,7 @@ function validateFileFormat(csvFile) {
   return null;
 }
 
-// Validate the header columns of the CSV file
+// 4c. Validate correct header(column) file fields names.
 function validateCSVHeaders(headers) {
   const expectedHeaders = [
     "Student_Id",
@@ -69,7 +71,8 @@ const validateEmail = (email) => {
   );
 };
 
-// Validate row data
+// 4d. Validate data for each row record is valid if not, display the offending
+// error.
 function isValidRow(row) {
   // console.log(".................isvalidRow.................");
   // console.log("row:");
@@ -82,6 +85,7 @@ function isValidRow(row) {
     isNaN(+row["Percentage"]) ||
     +row["Percentage"] > 1.0
   ) {
+    console.log(row);
     return false;
   }
 
@@ -90,11 +94,13 @@ function isValidRow(row) {
     typeof row["First_Name"] !== "string" ||
     typeof row["Last_Name"] !== "string"
   ) {
+    console.log(row);
     return false;
   }
 
   // Email
   if (!validateEmail(row["Email"])) {
+    console.log(row);
     return false;
   }
 
@@ -102,12 +108,14 @@ function isValidRow(row) {
   let dateStr =
     row["Upload_Date"].substring(0, 5) + "20" + row["Upload_Date"].substring(5);
   if (isNaN(new Date(dateStr))) {
+    console.log(row);
     return false;
   }
   return true;
 }
 
-// Post data to endpoint at url
+// 5a. Authenticate to another API enabled backend environment, and
+// 5b. Send each processed row record to the API using either GET / POST.
 async function postRecordData(
   url = "https://ucdavis-iet.com/sample-endpoint-url",
   data
@@ -122,8 +130,10 @@ async function postRecordData(
   return response.json(); // parses JSON response into native JavaScript objects
 }
 
-// Send Error Notification to a system admin email upon successful completion.
-// Generate & send an error notification email to system admin for any failed records if any.
+// 6b. Send Error Notification to a system admin email upon successful
+//     completion
+// 6c. Generate & send an error notification email to system admin for any
+//     failed records if any.
 async function sendEmail(errorMessage) {
   const mailOptions = {
     from: "mijkim@ucdavis.edu",
@@ -169,13 +179,11 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
   let errorMessage;
 
   const parser = csv.parse({
-    // columns: true,
     // bom needed for the first key to be parsed properly
     bom: true,
+    // columns: true,
   });
   parser.on("readable", function () {
-    // console.log("headers:", headers);
-
     // Parse first row (headers)
     if ((columns = parser.read()) !== null) {
       headers = columns;
@@ -185,7 +193,10 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
         return;
       }
     } else if (headers.length === 0) {
-      // This has to be an else if statement, because the parser goes through readable twice
+      // 4b. Validate Uploaded datafile is not empty/blank
+      // If there are no headers read, it means the file is empty.
+      // This has to be an else if statement, because the parser goes through
+      // readable twice
       errorMessage = "Blank/unreadable file";
       return;
     }
@@ -200,13 +211,13 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
         return obj;
       }, {});
 
-      // Assert that we have not parsed more than what we should
+      // 4e. Validate data file is not more than N records. e.g. N=10
       if (processedRecords >= N) {
         fails.push(rowData);
         continue;
       }
 
-      // If row is valid, add to successes; otherwise add to fails
+      // 6a. Verify Success / Error for all records.
       if (isValidRow(rowData)) {
         successes.push(rowData);
       } else {
@@ -231,7 +242,9 @@ app.post("/upload", upload.single("csvFile"), (req, res) => {
       fail: fails,
     };
 
-    postRecordData((url = "http://127.0.0.1:3000/receive"), records); // TODO: Change to actual endpoint
+    // 5a&b
+    // TODO: Change to actual endpoint
+    postRecordData((url = "http://127.0.0.1:3000/receive"), records);
 
     // Error message to email
     let emailMessage = "";
